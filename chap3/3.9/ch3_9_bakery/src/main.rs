@@ -1,21 +1,19 @@
 // 最適化抑制読み書き用
 use std::ptr::{read_volatile, write_volatile}; // <1>
 // メモリバリア用
-use std::sync::atomic::{fence, Ordering}; // <2>
+// use std::sync::atomic::{fence, Ordering}; // <2>
 use std::thread;
 
 const NUM_THREADS: usize = 4;   // スレッド数
 const NUM_LOOP: usize = 100000; // 各スレッドでのループ数
 
 // volatile用のマクロ <3>
-macro_rules! read_mem {
-    ($addr: expr) => { unsafe { read_volatile($addr) } };
+unsafe fn read_mem<T>(addr: &T) -> T {
+    read_volatile(addr as *const T)
 }
 
-macro_rules! write_mem {
-    ($addr: expr, $val: expr) => {
-        unsafe { write_volatile($addr, $val) }
-    };
+unsafe fn write_mem<T>(addr: &mut T, val: T) {
+    write_volatile(addr as *mut T, val)
 }
 
 // パン屋のアルゴリズム用の型 <4>
@@ -28,24 +26,24 @@ impl BakeryLock {
     // ロック関数。idxはスレッド番号
     fn lock(&mut self, idx: usize) -> LockGuard {
         // ここからチケット取得処理 <5>
-        fence(Ordering::SeqCst);
-        write_mem!(&mut self.entering[idx], true);
-        fence(Ordering::SeqCst);
+        // fence(Ordering::SeqCst);
+        unsafe { write_mem::<bool>(&mut self.entering[idx], true); }
+        // fence(Ordering::SeqCst);
 
         // 現在配布されているチケットの最大値を取得 <6>
         let mut max = 0;
         for i in 0..NUM_THREADS {
-            if let Some(t) = read_mem!(&self.tickets[i]) {
+            if let Some(t) = unsafe { read_mem::<Option<u64>>(&self.tickets[i]) } {
                 max = max.max(t);
             }
         }
         // 最大値+1を自分のチケット番号とする <7>
         let ticket = max + 1;
-        write_mem!(&mut self.tickets[idx], Some(ticket));
+        unsafe { write_mem::<Option<u64>>(&mut self.tickets[idx], Some(ticket)); }
 
-        fence(Ordering::SeqCst);
-        write_mem!(&mut self.entering[idx], false); // <8>
-        fence(Ordering::SeqCst);
+        // fence(Ordering::SeqCst);
+        unsafe { write_mem::<bool>(&mut self.entering[idx], false); } // <8>
+        // fence(Ordering::SeqCst);
 
         // ここから待機処理 <9>
         for i in 0..NUM_THREADS {
@@ -54,13 +52,13 @@ impl BakeryLock {
             }
 
             // スレッドiがチケット取得中なら待機
-            while read_mem!(&self.entering[i]) {} // <10>
+            while unsafe { read_mem::<bool>(&self.entering[i]) } {} // <10>
 
             loop {
                 // スレッドiと自分の優先順位を比較して
                 // 自分の方が優先順位が高いか、
                 // スレッドiが処理中でない場合に待機を終了 <11>
-                match read_mem!(&self.tickets[i]) {
+                match unsafe { read_mem::<Option<u64>>(&self.tickets[i]) } {
                     Some(t) => {
                         // スレッドiのチケット番号より
                         // 自分の番号の方が若いか、
@@ -81,7 +79,7 @@ impl BakeryLock {
             }
         }
 
-        fence(Ordering::SeqCst);
+        // fence(Ordering::SeqCst);
         LockGuard { idx }
     }
 }
@@ -94,8 +92,8 @@ struct LockGuard {
 impl Drop for LockGuard {
     // ロック解放処理 <13>
     fn drop(&mut self) {
-        fence(Ordering::SeqCst);
-        write_mem!(&mut LOCK.tickets[self.idx], None);
+        // fence(Ordering::SeqCst);
+        unsafe { write_mem::<Option<u64>>(&mut LOCK.tickets[self.idx], None); }
     }
 }
 
