@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = [
+    "chap3/3.8/ch3_8_2_cond",
+    "chap3/3.8/ch3_8_1_mutex",
+    "chap3/3.8/ch3_8_3_rwlock",
+    "chap3/3.8/ch3_8_4_barrier",
+    "chap3/3.8/ch3_8_5_channel",
+    "chap3/3.8/ch3_8_5_semaphore",
+    "chap3/3.9/ch3_9_bakery",
+    "chap4/4.1/ch4_1_philosophers",
+    "chap4/4.1/ch4_1_rwlock_1_1",
+    "chap4/4.1/ch4_1_rwlock_1_2",
+    "chap4/4.1/ch4_1_rwlock_2_1",
+    "chap4/4.1/ch4_1_rwlock_2_2",
+    "chap4/4.3/ch4_3_banker",
+    "chap4/4.4/ch4_4_reent_rust",
+    "chap4/4.6/ch4_6_signal_rust",
+    "chap4/4.7/ch4_7_barrier",
+]
